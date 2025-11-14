@@ -1,0 +1,24 @@
+{
+  "name": "connect_api",
+  "version": "1.0.0",
+  "description": "Projeto para o evento connect",
+  "homepage": "https://github.com/DennisGabriel-Dev/connect_api#readme",
+  "bugs": {
+    "url": "https://github.com/DennisGabriel-Dev/connect_api/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DennisGabriel-Dev/connect_api.git"
+  },
+  "license": "ISC",
+  "author": "ADS V",
+  "type": "module",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}
