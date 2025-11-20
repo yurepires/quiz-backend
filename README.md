@@ -19,6 +19,14 @@
    npm run start
    ```
 
+
+## Configuração do projeto
+Você irá precisar de um arquivo .env que deve ter esse conteúdo:
+```
+DATABASE_URL=<URL_MONGO_DB>
+```
+sugiro que o responsável de cada grupo entre em contato comigo(Dennis) para pegar a credencial do MongoDB.
+
 ## Regras para criação de endpoints:
 Iremos usar o padrão REST, esse [guia](https://www.alura.com.br/artigos/rest-principios-e-boas-praticas) pode ajudar. <br>
 A identificação do recurso deve ser feita utilizando-se o conceito de URI (Uniform Resource Identifier) <br>
@@ -31,12 +39,27 @@ Exemplos de como as URIs devem ficar:
 
 Obs: para atualizar, deletes ou exibições, iremos delegar aos verbos do HTTP: GET, POST, PUT, PATCH, DELETE.
 
-
-
 ## Importante:
 Para contribuir com a aplicação, abra apenas um PR com todo o código produzido pela equipe.<br>
 Sugestão de nomeclatura das branchs: se seu grupo for de QRCode por exemplo, você pode usar a seguinte nomeclatura na branch e PR: ```qr_code-feat-xpto```<br>
-Por favor, ao abrir o PR, faça uma descrição clara do que foi feito com fotos(se tratando de telas construídas). Isso vai facilitar a revisão de código e agilizar o merge.<br>
+Por favor, ao abrir o  Pull Request(PR), faça uma descrição clara do que foi feito com fotos(se tratando de telas construídas). Isso vai facilitar a revisão de código e agilizar o merge.<br>
+Exemplo de [PR](https://github.com/DennisGabriel-Dev/connect_api/pull/1)
 
+## Padrão/Estrutura de diretórios para a API:
+```
+...
+src/
+  controllers/
+    usuariosController.js
+    presencaController.js
+    ...
+  routes/
+    usuariosRoutes.js
+    presencaRoutes.js
+  services/  ## para regras de negócio ou código complexo
+    usuariosService.js
+  ...
+...
+```
 
 ## Bom desenvolvimento a todos :)
