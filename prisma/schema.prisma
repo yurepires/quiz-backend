@@ -14,8 +14,66 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  ESTUDANTE
+  ADMIN
+}
+
 model Usuario {
   id    String @id @default(auto()) @map("_id") @db.ObjectId
   email String @unique
   nome  String?
+  role Role @default(ESTUDANTE)
+  pontosTotais Int @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tentativas Tentativa[]
+}
+
+model Quiz {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  titulo       String
+  descricao    String?
+  dataPalestra DateTime?
+  liberado     Boolean    @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  perguntas Pergunta[]
+  tentativas Tentativa[]
+}
+
+model Pergunta {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  texto    String
+  pontos   Int      @default(10)
+
+  quizId   String   @db.ObjectId
+  quiz     Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  opcoes   Opcao[]
+}
+
+model Opcao {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  texto      String
+  eCorreta   Boolean  @default(false)
+
+  perguntaId String   @db.ObjectId
+  pergunta   Pergunta @relation(fields: [perguntaId], references: [id], onDelete: Cascade)
+}
+
+model Tentativa {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  pontosObtidos      Int
+  enviadoEm DateTime @default(now())
+
+  usuarioId String   @db.ObjectId
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+
+  quizId    String   @db.ObjectId
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
+
+  @@unique([usuarioId, quizId])
 }
