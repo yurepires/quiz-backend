@@ -13,10 +13,10 @@ export const criar = async (req, res) => {
 export const listarTodos = async (req, res) => {
   try {
 
-    const quizzes = await quizService.listarQuizzes();
-    return res.json(quizzes);
+    const quizzes = await quizService.listarQuizzes()
+    return res.json(quizzes)
   } catch (error) {
-    return res.status(500).json({ error: 'Erro ao listar quizzes' });
+    return res.status(500).json({ error: 'Erro ao listar quizzes' })
   }
 }
 
@@ -57,5 +57,31 @@ export const liberar = async (req, res) => {
     return res.json({ mensagem: 'Quiz liberado com sucesso!', quiz })
   } catch (error) {
     return res.status(500).json({ error: 'Erro ao liberar quiz' })
+  }
+}
+
+export const responder = async (req, res) => {
+  try {
+    const { id: quizId } = req.params
+    const { respostas } = req.body
+    
+    const usuarioId = req.headers['x-user-id']
+
+    if (!usuarioId) {
+      return res.status(401).json({ error: 'ID do usuário é obrigatório para responder o quiz.' })
+    }
+
+    const resultado = await quizService.responderQuiz(quizId, usuarioId, respostas)
+    
+    return res.status(200).json({
+      mensagem: `Quiz finalizado! Você obteve ${resultado.tentativa.pontosObtidos} de ${resultado.pontuacaoMaxima} pontos.`,
+      resultado,
+    })
+  } catch (error) {
+    if (error.message.includes('já respondeu')) {
+      return res.status(400).json({ error: error.message })
+    }
+    console.error(error)
+    return res.status(500).json({ error: 'Erro ao processar respostas.', detalhes: error.message })
   }
 }
