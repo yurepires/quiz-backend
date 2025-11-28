@@ -1,43 +1,13 @@
 import prisma from '../lib/prisma.js'
 
-export const criarQuiz = async (dados) => {
-  const quiz = await prisma.quiz.create({
-    data: {
-      titulo: dados.titulo,
-      descricao: dados.descricao,
-      dataPalestra: new Date(dados.dataPalestra),
-      liberado: false,
-      perguntas: {
-        create: dados.perguntas.map(pergunta => ({
-          texto: pergunta.texto,
-          pontos: pergunta.pontos,
-          opcoes: {
-            create: pergunta.opcoes.map(opcao => ({
-              texto: opcao.texto,
-              eCorreta: opcao.eCorreta
-            }))
-          }
-        }))
-      }
-    },
-    include: {
-      perguntas: {
-        include: { opcoes: true }
-      }
-    }
-  })
-
-  return quiz
-}
-
 export const listarQuizzes = async () => {
-
   const quizzes = await prisma.quiz.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
-      _count: {
-        select: { perguntas: true }
-      }
+    select: {
+      id: true,
+      titulo: true,
+      descricao: true,
+      liberado: true,
+      _count: true
     }
   })
 
@@ -45,139 +15,106 @@ export const listarQuizzes = async () => {
 }
 
 export const listarQuizzesLiberados = async () => {
-
   const quizzes = await prisma.quiz.findMany({
-    where: {liberado: true},
-    orderBy: { createdAt: 'desc' },
-    include: {
-      _count: {
-        select: { perguntas: true }
-      }
+    where: { liberado: true },
+    select: {
+      id: true,
+      titulo: true,
+      descricao: true,
+      liberado: true,
+      _count: true
     }
   })
 
   return quizzes
 }
 
-// Busca quiz pelo id para o aluno
-// 'eCorreta' não é enviado
+// Busca quiz pelo id para o participante
+// Remove informação `eCorreta` das opções antes de retornar
 export const buscarQuizPorId = async (id) => {
-  const quiz = await prisma.quiz.findUnique({
-    where: { id },
-    include: {
-      perguntas: {
-        select: {
-          id: true,
-          texto: true,
-          pontos: true,
-          opcoes: {
-            select: {
-              id: true,
-              texto: true
-            }
-          }
-        }
-      }
-    }
-  })
+  const quiz = await prisma.quiz.findUnique({ where: { id } })
+  if (!quiz) return null
 
-  return quiz
-}
+  // clone do quiz sem o campo eCorreta
+  const safeQuiz = {
+    id: quiz.id,
+    titulo: quiz.titulo,
+    descricao: quiz.descricao,
+    liberado: quiz.liberado,
+    perguntas: (quiz.perguntas || []).map(p => ({
+      id: p.id,
+      texto: p.texto,
+      pontos: p.pontos,
+      opcoes: (p.opcoes || []).map(o => ({ id: o.id, texto: o.texto }))
+    }))
+  }
 
-export const liberarQuiz = async (id) => {
-  const quiz = await prisma.quiz.update({
-    where: { id },
-    data: { liberado: true }
-  })
-
-  return quiz
+  return safeQuiz
 }
 
 /**
  * Responder Quiz e Calcular Pontuação
- * @param {string} quizId - ID do quiz
- * @param {string} usuarioId - ID do usuário logado
- * @param {Array<{perguntaId: string, opcaoId: string}>} respostas - Array de respostas do usuário
+ * - Verifica tentativa existente (composite unique participanteId_quizId)
+ * - Usa embeds para validar perguntas/opcoes
+ * - Cria Tentativa e Pontuacao (coleção separada) em transação
  */
-export const responderQuiz = async (quizId, usuarioId, respostas) => {
-  // Verifica se o usuário já respondeu
+export const responderQuiz = async (quizId, participanteId, respostas) => {
+  // Verifica se o participante já respondeu
   const tentativaExistente = await prisma.tentativa.findUnique({
     where: {
-      usuarioId_quizId: {
-        usuarioId,
+      participanteId_quizId: {
+        participanteId,
         quizId,
       },
     },
   })
 
   if (tentativaExistente) {
-    throw new Error('O usuário já respondeu a este quiz.')
+    throw new Error('O participante já respondeu a este quiz.')
   }
 
-  // Busca o quiz e as respostas corretas
-  const quizComRespostas = await prisma.quiz.findUnique({
-    where: { id: quizId },
-    include: {
-      perguntas: {
-        include: {
-          opcoes: true,
-        },
-      },
-    },
-  })
-
-  if (!quizComRespostas || !quizComRespostas.liberado) {
-    throw new Error('Quiz não encontrado ou não liberado.')
-  }
+  // Busca o quiz com embeds
+  const quiz = await prisma.quiz.findUnique({ where: { id: quizId } })
+  if (!quiz) throw new Error('Quiz não encontrado')
+  if (!quiz.liberado) throw new Error('Quiz ainda não está liberado')
 
   let pontuacaoObtida = 0
   let pontuacaoMaxima = 0
+  const detalhesRespostas = []
 
-  // Calcula a pontuação
-  for (const respostaUsuario of respostas) {
-    const pergunta = quizComRespostas.perguntas.find(
-      (p) => p.id === respostaUsuario.perguntaId
-    )
+  for (const resp of respostas) {
+    const pergunta = (quiz.perguntas || []).find(p => String(p.id) === String(resp.perguntaId))
+    if (!pergunta) throw new Error(`Pergunta não pertence a este quiz: ${resp.perguntaId}`)
 
-    if (!pergunta) continue
+    pontuacaoMaxima += pergunta.pontos || 0
 
-    pontuacaoMaxima += pergunta.pontos // Acumula pontuação máxima
+    const opcao = (pergunta.opcoes || []).find(o => String(o.id) === String(resp.opcaoId))
+    if (!opcao) throw new Error(`Opção inválida para pergunta ${resp.perguntaId}`)
 
-    const opcaoSelecionada = pergunta.opcoes.find(
-      (o) => o.id === respostaUsuario.opcaoId
-    )
+    const acertou = !!opcao.eCorreta
+    const pontosPergunta = acertou ? (pergunta.pontos || 0) : 0
+    pontuacaoObtida += pontosPergunta
 
-    if (opcaoSelecionada && opcaoSelecionada.eCorreta) {
-      // Se a opção selecionada for a correta, adiciona os pontos da pergunta
-      pontuacaoObtida += pergunta.pontos
-    }
+    detalhesRespostas.push({ perguntaId: pergunta.id, opcaoId: opcao.id, acertou, pontosObtidos: pontosPergunta })
   }
 
-  // Salva tentativa e atualiza pontuação total do usuário
-  const [tentativa, usuarioAtualizado] = await prisma.$transaction([
-    // Cria o registro de Tentativa
+  // Cria tentativa e registra pontuação em transação
+  const [tentativa, pontuacao] = await prisma.$transaction([
     prisma.tentativa.create({
       data: {
-        usuarioId,
+        participanteId,
         quizId,
         pontosObtidos: pontuacaoObtida,
       },
     }),
-
-    // Atualiza a pontuação total do Usuário
-    prisma.usuario.update({
-      where: { id: usuarioId },
+    prisma.pontuacao.create({
       data: {
-        pontosTotais: {
-          increment: pontuacaoObtida,
-        },
+        participanteId,
+        quizId,
+        pontos: pontuacaoObtida,
       },
-    }),
+    })
   ])
 
-  return {
-    tentativa,
-    pontuacaoMaxima,
-    usuarioPontuacaoTotal: usuarioAtualizado.pontosTotais,
-  }
+  return { tentativa, pontuacao, pontuacaoMaxima, detalhesRespostas }
 }

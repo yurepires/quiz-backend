@@ -1,20 +1,24 @@
 import express from 'express'
-import usuariosRoutes from './routes/usuariosRoutes.js'
+import cors from 'cors'
+
+// Importação das rotas
 import quizRoutes from './routes/quizRoutes.js'
+
 const app = express()
 const port = 5000
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-app.use('/api/v1/usuarios', usuariosRoutes);
+app.use(cors())
 
 app.use('/api/v1/quizzes', quizRoutes)
 
+// Rota Raiz de Teste
 app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
+  res.send('API Connect rodando');
+});
 
+// Inicialização do Servidor
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+  console.log(`Servidor rodando na porta ${port}`);
+});
