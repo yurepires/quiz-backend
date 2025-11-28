@@ -32,24 +32,53 @@ export const listarQuizzesLiberados = async () => {
 // Busca quiz pelo id para o participante
 // Remove informação `eCorreta` das opções antes de retornar
 export const buscarQuizPorId = async (id) => {
-  const quiz = await prisma.quiz.findUnique({ where: { id } })
+  const quiz = await prisma.quiz.findUnique({
+    where: { id }
+  })
+
   if (!quiz) return null
 
-  // clone do quiz sem o campo eCorreta
+  // 2. Lógica de Aleatoriedade e Segurança
+  // Como é Embedded, acessamos quiz.perguntas diretamente
+  
+  // A. Embaralha a ordem das perguntas
+  const perguntasEmbaralhadas = embaralharArray(quiz.perguntas || [])
+
+  const safePerguntas = perguntasEmbaralhadas.map(p => {
+    // B. Embaralha as opções desta pergunta
+    const opcoesEmbaralhadas = embaralharArray(p.opcoes || [])
+
+    return {
+      id: p.id,
+      texto: p.texto,
+      pontos: p.pontos,
+      // C. Sanitização: Mapeamos apenas ID e Texto para remover 'eCorreta'
+      opcoes: opcoesEmbaralhadas.map(o => ({
+        id: o.id,
+        texto: o.texto
+      }))
+    }
+  })
+
+  // 3. Monta o objeto de resposta seguro
   const safeQuiz = {
     id: quiz.id,
     titulo: quiz.titulo,
     descricao: quiz.descricao,
     liberado: quiz.liberado,
-    perguntas: (quiz.perguntas || []).map(p => ({
-      id: p.id,
-      texto: p.texto,
-      pontos: p.pontos,
-      opcoes: (p.opcoes || []).map(o => ({ id: o.id, texto: o.texto }))
-    }))
+    perguntas: safePerguntas // Array tratado
   }
 
   return safeQuiz
+}
+
+const embaralharArray = (array) => {
+  const novoArray = [...array];
+  for (let i = novoArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [novoArray[i], novoArray[j]] = [novoArray[j], novoArray[i]];
+  }
+  return novoArray;
 }
 
 /**
